@@ -4,6 +4,7 @@ import collections.abc
 import os
 import hashlib
 import numpy as np
+import healpy as hp
 import h5py
 import unyt
 
