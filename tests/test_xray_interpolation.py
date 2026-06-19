@@ -4,7 +4,8 @@ import h5py
 
 import sys
 sys.path.append('/cosma8/data/dp004/dc-bras1/xray_absorption/LightconeIO/lightcone_io')
-from lc_xray_calculator import XrayCalculator_LC
+#from lc_xray_calculator import XrayCalculator_LC
+import lightcone_io.lc_xray_calculator as Xcalc
 
 COMBINED_XRAY_EMISSIVITY_TABLE_FILENAME = "/cosma8/data/dp004/flamingo/Tables/Xray/X_Ray_table_combined.hdf5"
 rng = np.random.default_rng()
@@ -42,7 +43,7 @@ def sum_table_direct(band, observing_type, idx_z, idx_he, idx_T, idx_n):
     return np.sum(10**tab[band][observing_type][()][idx_z, idx_he, :, idx_T, idx_n], axis = 1)
 
 #initialise X-ray calculator
-xray_calc = XrayCalculator_LC(
+xray_calc = Xcalc(
         np.array([0.0, 1.0, 2.0]), # need to interpolate over the redshift range of particles 
         COMBINED_XRAY_EMISSIVITY_TABLE_FILENAME, 
         bands=['ROSAT', 'ROSAT', 'erosita-low', 'erosita-low', 'erosita-high', 'erosita-high'], 
