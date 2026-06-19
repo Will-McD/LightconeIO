@@ -43,7 +43,7 @@ def sum_table_direct(band, observing_type, idx_z, idx_he, idx_T, idx_n):
     return np.sum(10**tab[band][observing_type][()][idx_z, idx_he, :, idx_T, idx_n], axis = 1)
 
 #initialise X-ray calculator
-xray_calc = Xcalc(
+xray_calc = Xcalc.XrayCalculator_LC(
         np.array([0.0, 1.0, 2.0]), # need to interpolate over the redshift range of particles 
         COMBINED_XRAY_EMISSIVITY_TABLE_FILENAME, 
         bands=['ROSAT', 'ROSAT', 'erosita-low', 'erosita-low', 'erosita-high', 'erosita-high'], 
