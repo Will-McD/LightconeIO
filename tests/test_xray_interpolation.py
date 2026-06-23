@@ -3,7 +3,7 @@ from unyt import K, cm, mp, Msun
 import h5py 
 
 import sys
-sys.path.append('/cosma8/data/dp004/dc-bras1/xray_absorption/LightconeIO/lightcone_io')
+#sys.path.append('/cosma8/data/dp004/dc-bras1/xray_absorption/LightconeIO/lightcone_io')
 #from lc_xray_calculator import XrayCalculator_LC
 import lightcone_io.lc_xray_calculator as Xcalc
 
