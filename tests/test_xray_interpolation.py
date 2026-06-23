@@ -7,7 +7,7 @@ sys.path.append('/cosma8/data/dp004/dc-bras1/xray_absorption/LightconeIO/lightco
 #from lc_xray_calculator import XrayCalculator_LC
 import lightcone_io.lc_xray_calculator as Xcalc
 
-COMBINED_XRAY_EMISSIVITY_TABLE_FILENAME = "ests/data/Xray_tables/X_Ray_table_combined.hdf5"
+COMBINED_XRAY_EMISSIVITY_TABLE_FILENAME = "tests/data/Xray_tables/X_Ray_table_combined.hdf5"
 rng = np.random.default_rng()
 
 def create_fake_indices(size):
