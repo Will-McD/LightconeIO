@@ -431,13 +431,15 @@ def get_common_maps(filenames):
     return common_map_names
 
 
-def sum_maps(file_numbers, infile_format, outfile):
+
+def sum_maps(file_numbers, infile_format, outfile, chunck_size = 65536):
     """
     Write a new .hdf5 file with the datasets being the sum total of the input files datasets
 
     file_numbers:   the index number of the input files to sum 
     infile_format:  formated path to the input files of a given file number: path/to/the/input/file_{file_nr}.hdf5
     outfile:        the path and name of the file that will be written
+    chunck_size:    For Nside > 4096 maps, the number of pixels that are updated at once. 
     """
     
     # check if output exists, if it does then raise Exception, otherwise create output
@@ -521,9 +523,7 @@ def sum_maps(file_numbers, infile_format, outfile):
                         # if high nside map then update by chuncks
                         if nside <= 4096:
                             chunck_size=int(npix)
-                        else:
-                            
-                            chunck_size = 65536
+
                         
                         for start in range(0, npix, chunck_size):
                             end = int(min(start+chunck_size, npix))
