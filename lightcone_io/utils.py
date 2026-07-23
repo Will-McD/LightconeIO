@@ -433,13 +433,14 @@ def get_common_maps(filenames):
     return common_map_names
 
 
-def sum_maps(file_numbers, infile_format, outfile):
+def sum_maps(file_numbers, infile_format, outfile, map_names):
     """
     Write a new .hdf5 file with the datasets being the sum total of the input files datasets
 
     file_numbers:   the index number of the input files to sum 
     infile_format:  formated path to the input files of a given file number: path/to/the/input/file_{file_nr}.hdf5
     outfile:        the path and name of the file that will be written
+    map_names:      list of map names to sum together. If ['common'] use all maps that are found in every input file
     """
     
     # check if output exists, if it does then raise Exception, otherwise create output
@@ -455,10 +456,10 @@ def sum_maps(file_numbers, infile_format, outfile):
             raise Exception("input file not found")
 
     # gather map names
-    if args.map_names[0]=="common":
+    if map_names[0]=="common":
         common_map_names = get_common_maps(infilenames)
     else:
-        common_map_names=args.map_names
+        common_map_names=map_names
 
     print("Summing:", flush=True)
     for map_name in common_map_names:
