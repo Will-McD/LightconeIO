@@ -404,3 +404,147 @@ def match(arr1, arr2, arr2_sorted=False, arr2_index=None):
     ptr = np.where(ptr>= 0, ind[ptr], -1)
 
     return ptr
+
+
+
+
+
+def get_common_maps(filenames):
+    """
+    For a list of .hdf5 files, return a list of all common dataset names. 
+    """
+    # check for common datasets:
+
+    all_map_names=[[] for i in range(len(filenames))]
+
+    for file_idx, file_name in enumerate(filenames):
+        infile_names=[]
+        with h5py.File(file_name, "r") as f:
+            
+            for name in f:
+                dset=f[name]
+                if "nside" in dset.attrs:
+                    infile_names.append(name)
+
+
+        all_map_names[file_idx] = infile_names
+    common_map_names = list(set.intersection(*map(set, all_map_names)))
+    
+    return common_map_names
+
+
+def sum_maps(file_numbers, infile_format, outfile):
+    """
+    Write a new .hdf5 file with the datasets being the sum total of the input files datasets
+
+    file_numbers:   the index number of the input files to sum 
+    infile_format:  formated path to the input files of a given file number: path/to/the/input/file_{file_nr}.hdf5
+    outfile:        the path and name of the file that will be written
+    """
+    
+    # check if output exists, if it does then raise Exception, otherwise create output
+    if os.path.exists(outfile):
+        raise Exception("output file already exists")
+
+    # collect input filenames and make sure they exist
+    infilenames = []
+    for file_nr in file_numbers:
+        if os.path.exists(infile_format.format(file_nr=file_nr)):
+            infilenames.append(infile_format.format(file_nr=file_nr))
+        else:
+            raise Exception("input file not found")
+
+    # gather map names
+    if args.map_names[0]=="common":
+        common_map_names = get_common_maps(infilenames)
+    else:
+        common_map_names=args.map_names
+
+    print("Summing:", flush=True)
+    for map_name in common_map_names:
+        print(f"\t {map_name}")
+    
+    # create output file name
+    output_filename = outfile
+    print("\nwriting output: ", output_filename, flush=True)
+    with h5py.File(output_filename, "w") as outfile:
+
+        running_totals = {}
+        for map_name in common_map_names:
+            running_totals[map_name]=0
+
+        for file_idx, infile_name in enumerate(infilenames):
+            print(f"[{file_idx+1}/{len(infilenames)}] Opening input: {infile_name}", flush=True)
+            infile = h5py.File(infile_name, "r")
+
+            if file_idx==0:
+                for group in ("InternalCodeUnits", "Units", "Shell", "__xrayInfo"):
+                    if group in infile:
+                        infile.copy(group, outfile)
+
+            # Loop over maps
+            for name in common_map_names:
+                
+                print("\tReading  %s for file %d" % (name, file_numbers[file_idx]), flush=True)
+                
+                # Read in the full map
+                input_dataset = infile[name]
+                
+                if "nside" in input_dataset.attrs: # do not sum map if it doesnt have nside as attribute
+                    
+                    nside = input_dataset.attrs["nside"][0] # nside of input map from its attributes
+
+                    
+                    if file_idx==0:
+                        # copy the dataset over if inital file
+                        infile.copy(name, outfile)
+                        
+                        # update totals 
+                        running_totals[name]+=np.sum(input_dataset)
+                        output_map_total=np.sum(outfile[name])
+                    
+                    else:
+                        # sum maps if not inital file
+ 
+                        # check maps are the same shape dataset
+                        output_dataset = outfile[name]
+                        assert np.shape(input_dataset) == np.shape(output_dataset)
+
+                        # check maps being summed have matching attributes for nside and units
+                        for k, v in input_dataset.attrs.items():
+                            if k != "Started":
+
+                                assert k in output_dataset.attrs # check that it does exist 
+                                assert v == output_dataset.attrs[k]# check that attribute values are consistent
+
+                        # start updating the output 
+                        npix = input_dataset.shape[0]
+
+                        # if high nside map then update by chuncks
+                        if nside <= 4096:
+                            chunck_size=int(npix)
+                        else:
+                            
+                            chunck_size = 65536
+                        
+                        for start in range(0, npix, chunck_size):
+                            end = int(min(start+chunck_size, npix))
+
+                            in_chunk  = input_dataset[start:end]
+                            out_chunk = output_dataset[start:end]
+
+                            output_dataset[start:end] = in_chunk + out_chunk # write over indexed values
+
+                            running_totals[name] +=np.sum(in_chunk)
+
+                        output_map_total = np.sum(output_dataset)
+                    
+                    print(f"Updated Map: {name}\n\tstored map total: {output_map_total:.3e}\n\trunning total: {running_totals[name]:.3e}\n\t{output_map_total/running_totals[name] * 100:.3f} %", flush=True)
+
+                    outfile.flush() # flush to output file before moving to the next map
+
+            print("\nFinished file %d\n" % (file_numbers[file_idx]), flush=True)
+            infile.close()
+    
+    return None
+
