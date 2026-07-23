@@ -33,5 +33,5 @@ if __name__=="__main__":
         file_numbers=np.arange(args.init_file_numb, args.final_file_numb+1, 1)
         print(f"\nSumming files:\t {args.init_file_numb} - {args.final_file_numb}", flush=True)
     
-    __ = sum_maps(file_numbers, args.infile_format, args.outfile)
+    __ = sum_maps(file_numbers, args.infile_format, args.outfile, args.map_names)
 
