@@ -432,13 +432,14 @@ def get_common_maps(filenames):
 
 
 
-def sum_maps(file_numbers, infile_format, outfile, chunck_size = 65536):
+def sum_maps(file_numbers, infile_format, outfile, map_names, chunck_size = 65536):
     """
     Write a new .hdf5 file with the datasets being the sum total of the input files datasets
 
     file_numbers:   the index number of the input files to sum 
     infile_format:  formated path to the input files of a given file number: path/to/the/input/file_{file_nr}.hdf5
     outfile:        the path and name of the file that will be written
+    map_names:      list of map (dataset) names to sum together. If ['common'] sum all map names that are common to all input files 
     chunck_size:    For Nside > 4096 maps, the number of pixels that are updated at once. 
     """
     
@@ -455,10 +456,10 @@ def sum_maps(file_numbers, infile_format, outfile, chunck_size = 65536):
             raise Exception("input file not found")
 
     # gather map names
-    if args.map_names[0]=="common":
+    if map_names[0]=="common":
         common_map_names = get_common_maps(infilenames)
     else:
-        common_map_names=args.map_names
+        common_map_names=map_names
 
     print("Summing:", flush=True)
     for map_name in common_map_names:
