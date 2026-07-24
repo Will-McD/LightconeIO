@@ -434,13 +434,16 @@ def get_common_maps(filenames):
 
 def sum_maps(file_numbers, infile_format, outfile, map_names, chunck_size = 65536):
     """
-    Write a new .hdf5 file with the datasets being the sum total of the input files datasets
+    Write a new .hdf5 file with the datasets being the sum total of the input files datasets. 
+     
+    Params
+        file_numbers:   the index number of the input files to sum 
+        infile_format:  formated path to the input files of a given file number: path/to/the/input/file_{file_nr}.hdf5
+        outfile:        the path and name of the file that will be written
+        chunck_size:    For Nside > 4096 maps, the number of pixels that are updated at once. 
 
-    file_numbers:   the index number of the input files to sum 
-    infile_format:  formated path to the input files of a given file number: path/to/the/input/file_{file_nr}.hdf5
-    outfile:        the path and name of the file that will be written
-    map_names:      list of map (dataset) names to sum together. If ['common'] sum all map names that are common to all input files 
-    chunck_size:    For Nside > 4096 maps, the number of pixels that are updated at once. 
+    Returns
+        a dictionary of the maps with the total added per file, list of file names
     """
     
     # check if output exists, if it does then raise Exception, otherwise create output
@@ -461,18 +464,24 @@ def sum_maps(file_numbers, infile_format, outfile, map_names, chunck_size = 6553
     else:
         common_map_names=map_names
 
+    # store running totals
+    running_totals= np.zeros(len(common_map_names))
+    # store running totals for prior iteration
+    totals_cache=np.zeros(len(common_map_names))
+    # long term storage of totals added
+    totals_long_mem={}
+
     print("Summing:", flush=True)
     for map_name in common_map_names:
         print(f"\t {map_name}")
+        totals_long_mem[map_name] = np.zeros(len(infilenames), dtype=float)
     
+
     # create output file name
     output_filename = outfile
     print("\nwriting output: ", output_filename, flush=True)
     with h5py.File(output_filename, "w") as outfile:
 
-        running_totals = {}
-        for map_name in common_map_names:
-            running_totals[map_name]=0
 
         for file_idx, infile_name in enumerate(infilenames):
             print(f"[{file_idx+1}/{len(infilenames)}] Opening input: {infile_name}", flush=True)
@@ -484,9 +493,9 @@ def sum_maps(file_numbers, infile_format, outfile, map_names, chunck_size = 6553
                         infile.copy(group, outfile)
 
             # Loop over maps
-            for name in common_map_names:
+            for name_idx, name in enumerate(common_map_names):
                 
-                print("\tReading  %s for file %d" % (name, file_numbers[file_idx]), flush=True)
+                print("Reading  %s for file %d" % (name, file_numbers[file_idx]), flush=True)
                 
                 # Read in the full map
                 input_dataset = infile[name]
@@ -501,7 +510,7 @@ def sum_maps(file_numbers, infile_format, outfile, map_names, chunck_size = 6553
                         infile.copy(name, outfile)
                         
                         # update totals 
-                        running_totals[name]+=np.sum(input_dataset)
+                        running_totals[name_idx]+=np.sum(input_dataset)
                         output_map_total=np.sum(outfile[name])
                     
                     else:
@@ -534,17 +543,31 @@ def sum_maps(file_numbers, infile_format, outfile, map_names, chunck_size = 6553
 
                             output_dataset[start:end] = in_chunk + out_chunk # write over indexed values
 
-                            running_totals[name] +=np.sum(in_chunk)
+                            running_totals[name_idx] +=np.sum(in_chunk)
 
                         output_map_total = np.sum(output_dataset)
                     
-                    print(f"Updated Map: {name}\n\tstored map total: {output_map_total:.3e}\n\trunning total: {running_totals[name]:.3e}\n\t{output_map_total/running_totals[name] * 100:.3f} %", flush=True)
+                    # compute total value added from file
+                    added_total = running_totals[name_idx] - totals_cache[name_idx]
+                    
+                    # store in long term
+                    totals_long_mem[map_name][file_idx]=added_total
+
+                    #update cache
+                    totals_cache[name_idx] = running_totals[name_idx]
+                    
+                    value_added_str=f"\n\tAdded: {added_total:.3e}"
+                    running_total_str=f"\n\tStored map total: {output_map_total:.3e}\t running/predicted: {output_map_total/running_totals[name] * 100:.3f} %"
+                    update_str = f"Updated Map: {name}" + value_added_str + running_total_str
+                    
+                    print(update_str, flush=True)
 
                     outfile.flush() # flush to output file before moving to the next map
 
             print("\nFinished file %d\n" % (file_numbers[file_idx]), flush=True)
             infile.close()
     
-    return None
+    return totals_long_mem, infilenames
+
 
 
