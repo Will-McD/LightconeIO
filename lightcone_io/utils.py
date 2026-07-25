@@ -557,7 +557,7 @@ def sum_maps(file_numbers, infile_format, outfile, map_names, chunck_size = 6553
                     totals_cache[name_idx] = running_totals[name_idx]
                     
                     value_added_str=f"\n\tAdded: {added_total:.3e}"
-                    running_total_str=f"\n\tStored map total: {output_map_total:.3e}\t running/predicted: {output_map_total/running_totals[name] * 100:.3f} %"
+                    running_total_str=f"\n\tStored map total: {output_map_total:.3e}\t running/predicted: {output_map_total/running_totals[name_idx] * 100:.3f} %"
                     update_str = f"Updated Map: {name}" + value_added_str + running_total_str
                     
                     print(update_str, flush=True)
