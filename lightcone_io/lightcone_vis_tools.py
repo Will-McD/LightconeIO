@@ -42,6 +42,13 @@ def apply_expected_units(x, expected_units):
 def round_down_10(x):
     return int(math.floor(x / 10) * 10)
 
+def round_up_10(x):
+    import math
+    if x == 0:
+        return 0
+    power = 10 ** (int(math.floor(math.log10(abs(x)))) - 1)
+    return math.ceil(x / power) * power
+
 def orderOfMagnitude(number):
     return math.floor(math.log(number, 10))
 
@@ -479,7 +486,7 @@ class BeamProjection:
             if np.max(shifted_coords[:, i].to_value("Mpc")) < snap.metadata.boxsize[i].to_value("Mpc"):
                 ax_sidelengths[i] =snap.metadata.boxsize[i].to_value("Mpc")
             else:
-                ax_sidelengths[i] = round_up_by_10s(np.max(shifted_coords[:, i].to_value("Mpc"))+0.1) # new box sidelengths go from 0-> max part location in lc
+                ax_sidelengths[i] = round_up_10(np.max(shifted_coords[:, i].to_value("Mpc"))+0.1) # new box sidelengths go from 0-> max part location in lc
 
 
         # shifted coordinates 
