@@ -18,8 +18,8 @@ import cmasher as cmr
 
 
 # sim base dir
-boxsize_resolution="L1000N1800"
-
+#boxsize_resolution="L1000N1800"
+boxsize_resolution="L1000N0900"
 sim="HYDRO_FIDUCIAL"
 base_dir="/cosma8/data/dp004/flamingo/Runs/{LN}/{sim}".format(LN=boxsize_resolution, sim=sim)
 
@@ -85,9 +85,6 @@ gas_surface_density=gas_projections[0].to_value("Msun/Mpc**2")
 cdm_surface_density=cdm_projections[0].to_value("Msun/Mpc**2")
 total_surface_density=gas_surface_density+cdm_surface_density 
 
-for proj in gas_projections:
-    print(proj.units, proj.max(),proj.min())
-
 
 # create split beam plot of the total different surface density projections 
 
@@ -106,7 +103,7 @@ colour_maps=[
     "cubehelix",
     "cmr.eclipse"
 ]
-BP.split_beam_plot(
+wedge_imgs = BP.split_beam_plot(
     numb_wedges, projection_data, colour_maps, filename="./split_beam_surface_density_example.png",
     minor_tick_kwargs={"color":"k", "lw":0.6}, tick_label_kwargs={"rotation":"auto"}, overlay_grid=(True, False, False),
     titles=["Gas", "Gas+DM", "DM"]
@@ -133,10 +130,6 @@ BP.add_property_to_slice(dset_name="RedshiftWeightedTemp", dset=z_weighted_temp,
 
 temp_projections = BP.project_properties(['Temperatures',"MassWeightedTemp", "RedshiftWeightedTemp"], snapshot_filename, ptype="Gas", assign_units=["K", "K*Msun", "K*Msun"])
 
-
-for proj in temp_projections:
-    print(proj.units, proj.max(),proj.min())
-
 # projections come out in the same order they are entered
 Temp_surface_density=temp_projections[0].to_value("K/Mpc**2")
 TempM_surface_density=temp_projections[1].to_value("K*Msun/Mpc**2")
@@ -162,9 +155,10 @@ colour_maps=[
     "magma",
     "magma"
 ]
-BP.split_beam_plot(
+wedge_imgs = BP.split_beam_plot(
     numb_wedges, projection_data, colour_maps, filename="./split_beam_temp_example.png",
-    minor_tick_kwargs={"color":"k", "lw":0.6}, tick_label_kwargs={"rotation":"auto"}, overlay_grid=(False, False, False), major_tick_length=3.5,
-    redshift_label_offset=(0,-15,0), comoving_label_offset=(0,15,0), titles=["temp", "mass weighted", "z weighted"]
+    minor_tick_kwargs={"color":"k", "lw":0.6}, tick_label_kwargs={"rotation":0}, overlay_grid=(False, True, False), major_tick_length=3.5,
+    titles=["Temperature", "Mass weighted\nTemperature", r"Temperature$\,/\,$Redshift$^2$"],
+    redshift_label_offset=(0,-15,0), comoving_label_offset=(0,15,0), title_kwargs={'fontsize':5}
     )
 
