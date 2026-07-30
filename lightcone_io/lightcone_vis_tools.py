@@ -18,7 +18,7 @@ from matplotlib.patches import Polygon, Rectangle, ConnectionPatch
 import swiftsimio as sw
 from swiftsimio.objects import cosmo_array
 import collections
-
+import inspect
 
 def apply_expected_units(x, expected_units):
     """
@@ -486,7 +486,7 @@ class BeamProjection:
             if np.max(shifted_coords[:, i].to_value("Mpc")) < snap.metadata.boxsize[i].to_value("Mpc"):
                 ax_sidelengths[i] =snap.metadata.boxsize[i].to_value("Mpc")
             else:
-                ax_sidelengths[i] = round_up_10(np.max(shifted_coords[:, i].to_value("Mpc"))+0.1) # new box sidelengths go from 0-> max part location in lc
+                ax_sidelengths[i] = round_up_by_10s(np.max(shifted_coords[:, i].to_value("Mpc"))+0.1) # new box sidelengths go from 0-> max part location in lc
 
 
         # shifted coordinates 
@@ -626,12 +626,19 @@ class BeamProjection:
 
         return R
 
+    def filter_kwargs(self, func, kwargs):
+        params = inspect.signature(func).parameters
+        return {k: v for k, v in kwargs.items() if k in params}
     
     def split_beam_plot(self, numb_wedges, projection_data, colour_maps, 
             axs=None, filename=None,
-            angular_diameter=None, cosmology=None, redshift_range=None, axes_extent=None, update_badcol=True, figsize=(7,7), titles=None, **axes_kwargs):
+            angular_diameter=None, cosmology=None, redshift_range=None, axes_extent=None, update_badcol=True, figsize=(7,7), titles=None, **kwargs):
         
         """
+        Create plot of the whole beam, split into seperate wedges. 
+
+        Returns list of each projected wedge.  
+
         :param  numb_wedges:        number of wedges or different projections to show in the beam
         :type   numb_wedges:        int
         :param  projection_data:    nested list containing different segements of the beam the 2D array to plot and 
@@ -648,12 +655,12 @@ class BeamProjection:
         :param  cosmology:          the simualtions cosmology model
         :type   cosmology:          astropy comsology object, astropy.cosmology.flrw.w0wacdm.w0waCDM
         :param  redshift_range:     maximum and minimum redshift of the beam shown
-        :type   redshift_range:     list, np.ndarray or tuple
-        :param  axes_kwargs:        All arguments to be passed onto the add_beam_axes. 
+        :type   redshift_range:     list, np.ndarray or tuple 
         :param  update_badcol:      If true, modify all colour maps so that the minimum, nan and None values are set to black 
         :type   update_badcol:      boolean
         :param  axes_extent:        Extent of the plots axes, in coordinate space. 
                                     If None, then use the extent defined by the coordinates of the particles added to the slice. 
+        :param  kwargs:             All additional arguments to be passed onto the add_wedge and add_beam_axes functions. 
         """
 
         # update slice information and call predefined values where needed
@@ -691,7 +698,6 @@ class BeamProjection:
         print(f"beam angular diameter:\t{self.__diameter_deg:.2f} [deg]", flush=True)
         print(f"wedge angular diameter:\t{wedge_diameter_deg:.2f} [deg]", flush=True)
 
-
         # create redshift ticks for the range given 
         all_redshift_major_ticks=np.arange(0.05, 5.0, 0.05)
         all_redshift_minor_ticks=np.arange(0.01, 5.0, 0.01)
@@ -725,6 +731,11 @@ class BeamProjection:
         if titles is not None:
             assert len(titles) == numb_wedges
             
+        # seperate kwargs for image function and axes function 
+        img_kwargs = self.filter_kwargs(self.add_wedge, kwargs)
+        axes_kwargs = self.filter_kwargs(self.add_beam_axes, kwargs)
+        print(img_kwargs)
+        print(axes_kwargs)
 
         # iterate through the different split beams and add to plot
         for wedge_idx in range(numb_wedges):
@@ -748,7 +759,9 @@ class BeamProjection:
                 wedge_cmap, cmap_pix_range[0], cmap_pix_range[1], 
                 beam_radius_deg, wedge_diameter_deg, 
                 rmin, rmax, title=wedge_title,
-                img_zorder=-1, wedge_colour="black", wedge_lw=0.8, wedge_linestyle="-", wedge_zorder=10
+                img_zorder=-1, 
+                #wedge_colour="black", wedge_lw=0.8, wedge_linestyle="-", wedge_zorder=10, 
+                **img_kwargs
                 )
         
         # add axes to the outer edge of the whole beam 
@@ -762,12 +775,31 @@ class BeamProjection:
             plt.savefig(f"{filename}", dpi=300, bbox_inches='tight')
 
             plt.close()
-
+            return wedge_imgs
         if return_ax:
-            return axs
+            return axs, wedge_imgss
         elif return_fig:
-            return fig
+            return fig, wedge_imgs
 
+
+    def __define_wedge_params(self, wedge_kwargs=None):
+        
+        self.wedge_kwargs={
+            "alpha":1.0,
+            "lw":0.8,
+            "ls":"-",
+            "edgecolor":"k",
+            "facecolor":"none",
+            "path_effects":None,
+            "zorder":10,
+        }
+        
+        self.wedge_kwargs.update(**(wedge_kwargs or {}))
+        # if colour is given, assume its the edge colour and update
+        if "color" in self.wedge_kwargs:
+            specified_colour = self.wedge_kwargs["color"]
+            self.wedge_kwargs.pop("color")
+            self.wedge_kwargs["edgecolor"]=specified_colour
 
 
     def __define_title_params(self, title_kwargs=None):
@@ -778,17 +810,20 @@ class BeamProjection:
             "fontsize":10,
             "va":"center",
             "ha":"left",
-            "path_effects":[path_effects.withStroke(linewidth=1., foreground="black"), path_effects.Normal()]
+            "path_effects":[path_effects.withStroke(linewidth=1., foreground="black"), path_effects.Normal()],
+            "rotation_mode":"anchor",
         }
         
         self.title_kwargs.update(**(title_kwargs or {}))
         if "rotation" in self.title_kwargs:
             self.title_kwargs.pop("rotation")
-        if "rotation_mode" in self.title_kwargs:
-            self.title_kwargs.pop("rotation_mode")
+        if "zorder" in self.title_kwargs:
+            self.title_kwargs.pop("zorder")
 
 
-    def add_wedge(self, ax, wedge_idx, data_2D, cmap, pix_min, pix_max, beam_max_ang_radius_deg, wedge_ang_diameter_deg, rmin, rmax, title=None, img_zorder=10, wedge_colour="black", wedge_lw=1., wedge_linestyle="-", wedge_zorder=20, title_kwargs=None):
+    def add_wedge(self, ax, wedge_idx, data_2D, cmap, pix_min, pix_max, beam_max_ang_radius_deg, wedge_ang_diameter_deg, rmin, rmax, 
+        #title=None, img_zorder=10, wedge_colour="black", wedge_lw=1., wedge_linestyle="-", wedge_zorder=20, wedge_kwargs=None, title_kwargs=None):
+        title=None, img_zorder=10, wedge_kwargs=None, title_kwargs=None):
         """
         Add each smaller beam or wedge onto the plot. Returns the upadted projected image. 
 
@@ -812,8 +847,9 @@ class BeamProjection:
         :type   rmax:   float
         """
 
+        self.__define_wedge_params(wedge_kwargs)
         self.__define_title_params(title_kwargs)
-
+        
         theta0 = np.deg2rad(beam_max_ang_radius_deg - np.abs(wedge_idx*wedge_ang_diameter_deg))
         theta1 = np.deg2rad(beam_max_ang_radius_deg - np.abs((1+wedge_idx)*wedge_ang_diameter_deg))
 
@@ -868,7 +904,7 @@ class BeamProjection:
         )
         
         # add wedge to image
-        wedge = Polygon(verts, closed=True, facecolor="none", edgecolor=wedge_colour, linestyle=wedge_linestyle, lw=wedge_lw, zorder=wedge_zorder)
+        wedge = Polygon(verts, closed=True, **self.wedge_kwargs) #facecolor="none", edgecolor=wedge_colour, linestyle=wedge_linestyle, lw=wedge_lw, zorder=wedge_zorder)
         ax.add_patch(wedge)
         
         # clip to wedge
@@ -889,8 +925,7 @@ class BeamProjection:
                 title,
                 **self.title_kwargs,
                 rotation = np.rad2deg(theta_mid),
-                rotation_mode="anchor",
-                zorder=wedge_zorder + 1,
+                zorder=self.wedge_kwargs["zorder"] + 1,
             )
 
         return img, ax
