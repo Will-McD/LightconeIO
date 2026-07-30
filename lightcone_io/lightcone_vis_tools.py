@@ -295,7 +295,6 @@ class BeamProjection:
         ]
         self.axis_buffer=axis_boundaries_buffer
 
-
     def project_properties(self, project_particle_properties, snapshot_filename=None, resolution=1024, assign_units=None, ptype="Gas"):
         """
         Returns a 2D histogram of the selected properties for a given particle type
@@ -356,7 +355,6 @@ class BeamProjection:
                 projection_outputs.append(proj)
 
         return projection_outputs
-
 
     def add_lc_gas_to_snap(self, snap, particle_properties, assign_units):
  
@@ -424,7 +422,6 @@ class BeamProjection:
         del particle_properties
         
         return snap, preffered_units
-
 
     def add_lc_dm_to_snap(self, snap, particle_properties, assign_units):
  
@@ -537,7 +534,6 @@ class BeamProjection:
         
         return snap, preffered_units
 
-
     def make_mock_snapshot(self, particle_properties, snapshot_filename, resolution=1024, assign_units=None, ptype="Gas"):
         
         # sanity check properties
@@ -582,7 +578,6 @@ class BeamProjection:
             comoving=True, # assume comoving for all lightcone properties 
             scale_factor=1., scale_exponent=1 # assume defined at z=0 and has no additional scale factor effects
             )
-
 
     def rotation_matrix_from_vectors(self, v_to=np.array([1., 0., 0.])):
         """
@@ -734,8 +729,6 @@ class BeamProjection:
         # seperate kwargs for image function and axes function 
         img_kwargs = self.filter_kwargs(self.add_wedge, kwargs)
         axes_kwargs = self.filter_kwargs(self.add_beam_axes, kwargs)
-        print(img_kwargs)
-        print(axes_kwargs)
 
         # iterate through the different split beams and add to plot
         for wedge_idx in range(numb_wedges):
@@ -760,7 +753,6 @@ class BeamProjection:
                 beam_radius_deg, wedge_diameter_deg, 
                 rmin, rmax, title=wedge_title,
                 img_zorder=-1, 
-                #wedge_colour="black", wedge_lw=0.8, wedge_linestyle="-", wedge_zorder=10, 
                 **img_kwargs
                 )
         
@@ -781,7 +773,6 @@ class BeamProjection:
         elif return_fig:
             return fig, wedge_imgs
 
-
     def __define_wedge_params(self, wedge_kwargs=None):
         
         self.wedge_kwargs={
@@ -801,7 +792,6 @@ class BeamProjection:
             self.wedge_kwargs.pop("color")
             self.wedge_kwargs["edgecolor"]=specified_colour
 
-
     def __define_title_params(self, title_kwargs=None):
         
         self.title_kwargs={
@@ -820,9 +810,7 @@ class BeamProjection:
         if "zorder" in self.title_kwargs:
             self.title_kwargs.pop("zorder")
 
-
     def add_wedge(self, ax, wedge_idx, data_2D, cmap, pix_min, pix_max, beam_max_ang_radius_deg, wedge_ang_diameter_deg, rmin, rmax, 
-        #title=None, img_zorder=10, wedge_colour="black", wedge_lw=1., wedge_linestyle="-", wedge_zorder=20, wedge_kwargs=None, title_kwargs=None):
         title=None, img_zorder=10, wedge_kwargs=None, title_kwargs=None):
         """
         Add each smaller beam or wedge onto the plot. Returns the upadted projected image. 
@@ -904,7 +892,7 @@ class BeamProjection:
         )
         
         # add wedge to image
-        wedge = Polygon(verts, closed=True, **self.wedge_kwargs) #facecolor="none", edgecolor=wedge_colour, linestyle=wedge_linestyle, lw=wedge_lw, zorder=wedge_zorder)
+        wedge = Polygon(verts, closed=True, **self.wedge_kwargs)
         ax.add_patch(wedge)
         
         # clip to wedge
@@ -930,7 +918,6 @@ class BeamProjection:
 
         return img, ax
         
-
     def __define_tick_params(self, major_tick_kwargs=None, minor_tick_kwargs=None, tick_label_kwargs=None):
         self.major_tick_kwargs={
             "color":"black",
