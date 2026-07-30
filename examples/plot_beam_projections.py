@@ -18,8 +18,7 @@ import cmasher as cmr
 
 
 # sim base dir
-#boxsize_resolution="L1000N1800"
-boxsize_resolution="L1000N0900"
+boxsize_resolution="L1000N1800"
 sim="HYDRO_FIDUCIAL"
 base_dir="/cosma8/data/dp004/flamingo/Runs/{LN}/{sim}".format(LN=boxsize_resolution, sim=sim)
 
