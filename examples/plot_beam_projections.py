@@ -156,7 +156,7 @@ colour_maps=[
 ]
 wedge_imgs = BP.split_beam_plot(
     numb_wedges, projection_data, colour_maps, filename="./split_beam_temp_example.png",
-    minor_tick_kwargs={"color":"k", "lw":0.6}, tick_label_kwargs={"rotation":0}, overlay_grid=(False, True, False), major_tick_length=3.5,
+    minor_tick_kwargs={"color":"k", "lw":0.6}, tick_label_kwargs={"rotation":0}, overlay_grid=(True, False, False), major_tick_length=3.5,
     titles=["Temperature", "Mass weighted\nTemperature", r"Temperature$\,/\,$Redshift$^2$"],
     redshift_label_offset=(0,-15,0), comoving_label_offset=(0,15,0), title_kwargs={'fontsize':5}
     )
