@@ -483,7 +483,7 @@ class BeamProjection:
             if np.max(shifted_coords[:, i].to_value("Mpc")) < snap.metadata.boxsize[i].to_value("Mpc"):
                 ax_sidelengths[i] =snap.metadata.boxsize[i].to_value("Mpc")
             else:
-                ax_sidelengths[i] = round_up_by_10s(np.max(shifted_coords[:, i].to_value("Mpc"))+0.1) # new box sidelengths go from 0-> max part location in lc
+                ax_sidelengths[i] = round_up_10(np.max(shifted_coords[:, i].to_value("Mpc"))+0.1) # new box sidelengths go from 0-> max part location in lc
 
 
         # shifted coordinates 
@@ -769,7 +769,7 @@ class BeamProjection:
             plt.close()
             return wedge_imgs
         if return_ax:
-            return axs, wedge_imgss
+            return axs, wedge_imgs
         elif return_fig:
             return fig, wedge_imgs
 
