@@ -812,7 +812,7 @@ def main(args):
             if overlap_method == MASS_WEIGHTED:
                 if mass_name =="BoundSubhalo/TotalMass":
                     metric_column_name="BoundMassWeightedMetric"
-                elif (mass_name==f"{args.soap_so_name}/TotalMass") or arg.centrals_only==True:
+                elif (mass_name==f"{args.soap_so_name}/TotalMass") or args.centrals_only==True:
                     metric_column_name="MassWeightedMetric_"+args.soap_so_name.split("/")[-1]
                 else:
                     metric_column_name = "MassWeightedMetric"
@@ -822,7 +822,7 @@ def main(args):
             # determine halo mass dset name 
             if mass_name =="BoundSubhalo/TotalMass":
                 HaloMass_column_name="TotalBoundMass"
-            elif (mass_name==f"{args.soap_so_name}/TotalMass") or arg.centrals_only==True:
+            elif (mass_name==f"{args.soap_so_name}/TotalMass") or args.centrals_only==True:
                 HaloMass_column_name="HaloMass_"+args.soap_so_name.split("/")[-1]
             else:
                 HaloMass_column_name="HaloMass"
