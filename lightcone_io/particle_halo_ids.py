@@ -72,10 +72,7 @@ def rank_message(m, rank):
 def attr_scalar(value):
     """
     Some HDF5 attributes that are conceptually scalar are stored with a
-    length-1 array shape rather than truly 0-d, so int()/float() on them
-    directly raises a DeprecationWarning in NumPy >= 1.25 ("will error in
-    future"). Extract the single element explicitly instead - same pattern
-    virgo.mpi.parallel_hdf5.MultiFile.__init__ already uses internally.
+    length-1 array. Correct by only returning single element. 
     """
     return np.asarray(value).flat[0]
 
@@ -106,17 +103,10 @@ def snapshot_number_redshifts(boxsize_resolution, snapshot_number, inverse=False
 def _fallback_snapshot_table(box_resolution):
     """
     Build (first_snap, last_snap, snapshot_numbers, minimum_redshifts,
-    maximum_redshifts) from the hardcoded snapshot_number_redshifts() table,
-    for use when a halo lightcone catalogue has no Snapshots group at all
-    (some simulations lack this metadata even though the halo data itself
-    is present and populated).
-
-    minimum_redshifts/maximum_redshifts are only an approximation of each
-    snapshot's true lightcone shell bounds - the midpoint in redshift
-    between adjacent snapshots - since the real recorded bounds aren't
-    available in this fallback case. That's fine: get_halo_lightcone_file_idx
-    already pads its overlap match with margin_snapshots extra snapshots on
-    each side specifically to absorb this kind of boundary imprecision.
+    maximum_redshifts) from snapshot_number_redshifts() when a halo lightcone 
+    has no Snapshots group at all. 
+    Some simulations lack this metadata even though the halo data itself
+    is present and populated.
     """
     snapshot_numbers, z = snapshot_number_redshifts(box_resolution, None)
     z = np.asarray(z, dtype=float)
