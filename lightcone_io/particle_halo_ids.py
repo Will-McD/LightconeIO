@@ -5,11 +5,13 @@ import sys
 import argparse
 import numpy as np
 import time
-t0 = time.time()
 import psutil
 import datetime as dt
 import h5py
 import scipy.spatial
+
+t0 = time.time()
+
 from mpi4py import MPI
 comm = MPI.COMM_WORLD
 comm_size = comm.Get_size()
@@ -19,7 +21,6 @@ import virgo.util.match as match
 import virgo.mpi.parallel_hdf5 as phdf5
 import virgo.mpi.parallel_sort as psort
 import virgo.mpi.util as mpi_util
-
 
 # Constants to identify methods for dealing with particles in multiple halos
 FRACTIONAL_RADIUS=0
@@ -37,14 +38,12 @@ KNOWN_BOX_RESOLUTIONS = ("L1000N1800", "L1000N0900", "L1000N3600", "L2800N5040")
 KNOWN_PARTICLE_TYPES = ("BH", "DM", "Gas", "Neutrino", "Stars")
 
 def detect_box_resolution(path):
-    """
-    """
     return next((part for part in os.path.normpath(path).split(os.sep) if part in KNOWN_BOX_RESOLUTIONS), None)
 
 def batched(seq, batch_size):
     """
-    Yield successive batch_size-sized chunks of seq. batch_size=None yields
-    the whole seq as a single chunk (no batching). 
+    Yield successive batch_size-sized chunks of seq. 
+    If batch_size is None,  yield the whole seq. 
     """
     if batch_size is None:
         yield seq
@@ -64,7 +63,7 @@ def rank_message(m, rank):
     No rank barrier as we want independant messages 
     from each rank with time of arrival shown.
     """
-    
+    #comm.barrier()
     current_time=dt.datetime.now()
     time_str=current_time.strftime("%H:%M:%S")
     print('\t[Rank {rank_nr:03d}] [@{print_time}]'.format(rank_nr=rank,print_time=time_str) + m)
@@ -72,15 +71,16 @@ def rank_message(m, rank):
 def attr_scalar(value):
     """
     Some HDF5 attributes that are conceptually scalar are stored with a
-    length-1 array. Correct by only returning single element. 
+    length-1 array. int()/float() will therefore raises a DeprecationWarning 
+    in NumPy >= 1.25. 
+    Extract the single element explicitly instead.
     """
     return np.asarray(value).flat[0]
-
 
 def snapshot_number_redshifts(boxsize_resolution, snapshot_number, inverse=False):
     """
     Returns the redshift of snapshot number.
-        If inverse = True, returns snapshot number for redshift passed as snapshot_number param
+    If inverse is True, return the snapshot number for redshift passed as snapshot_number param
     """
     if (boxsize_resolution=="L1000N1800") or (boxsize_resolution=="L1000N0900"):
         snapshot_numbers=np.array([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77])
@@ -99,14 +99,20 @@ def snapshot_number_redshifts(boxsize_resolution, snapshot_number, inverse=False
 
     return snapshot_numbers, redshift
 
-
 def _fallback_snapshot_table(box_resolution):
     """
-    Build (first_snap, last_snap, snapshot_numbers, minimum_redshifts,
-    maximum_redshifts) from snapshot_number_redshifts() when a halo lightcone 
-    has no Snapshots group at all. 
-    Some simulations lack this metadata even though the halo data itself
-    is present and populated.
+    Called if halo lightcone file is missing /Snapshots group.
+
+    Use the hardcoded snapshot_number_redshifts() table to build
+    the /Snapshots attrs: 
+        - first_snap, 
+        - last_snap, 
+        - snapshot_numbers, 
+        - minimum_redshifts,
+        - maximum_redshifts
+    
+    Assume the min and max redshifts are the midpoint in redshift
+    between adjacent snapshots.
     """
     snapshot_numbers, z = snapshot_number_redshifts(box_resolution, None)
     z = np.asarray(z, dtype=float)
@@ -119,7 +125,6 @@ def _fallback_snapshot_table(box_resolution):
         minimum_redshifts[i] = 0.0 if i == n - 1 else 0.5 * (z[i] + z[i + 1])
 
     return int(snapshot_numbers.min()), int(snapshot_numbers.max()), snapshot_numbers, minimum_redshifts, maximum_redshifts
-
 
 def _rss_used():
     """
@@ -139,16 +144,15 @@ def report_rss(m, comm):
     sum_rss = comm.allreduce(rss_gb, op=MPI.SUM)
     message(f"RSS [{m}]: max = {max_rss:.2f} [GB], sum = {sum_rss:.2f} [GB]")
 
-
 def get_halo_lightcone_file_idx(halo_lightcone_filenames, comm, zmin=None, zmax=None, margin_snapshots=1, box_resolution=None):
     """
-    hbt halo lightcones do not consistently have the "Header/NumberOfFiles" attribute for phdf5.MultiFile. 
+    HBT halo lightcones do not consistently have the "Header/NumberOfFiles" attribute for phdf5.MultiFile. 
     Instead, use the fact that each file instead covers one snapshot to get file_idx array for phdf5.MultiFile.
 
     Params:
         :(str) halo_lightcone_filenames :    string for the format of the halo lightcone filename with {file_nr} as a variable. 
                                                 'path/to/halo/lightcone/files/file_for_snapshot_{file_nr}.hdf5'
-        :(float) zmin, zmax             :   if None use full range of halo lightcone. If given restrict the result to snapshots whose shell
+        :(float) zmin, zmax             :   if None use full range of halo lightcone. If given, restrict the result to snapshots whose shell
                                                 [minimum_redshifts, maximum_redshifts) overlaps with [zmin, zmax], padded by
                                                 margin_snapshots extra snapshots on each side.
         :(int) margin_snapshots         :   extra snapshots added as a buffer on each side of zmin and zmax. 
@@ -198,7 +202,8 @@ def get_halo_lightcone_file_idx(halo_lightcone_filenames, comm, zmin=None, zmax=
         if box_resolution is None:
             raise RuntimeError("box-resolution must be given so the hardcoded snapshot-redshift range table can be used instead")
         
-        # Pure computation from the hardcoded table, every rank independently does this, no need to broadcast 
+        # Values based on hardcoded table. 
+        # Every rank can do this independently and therefore no need to broadcast. 
         first_snap, last_snap, snapshot_numbers, minimum_redshifts, maximum_redshifts = _fallback_snapshot_table(box_resolution)
 
     if not need_redshifts:
@@ -212,7 +217,6 @@ def get_halo_lightcone_file_idx(halo_lightcone_filenames, comm, zmin=None, zmax=
     i1 = min(matched_idx[-1] + margin_snapshots, len(snapshot_numbers) - 1)
     return snapshot_numbers[i0:i1 + 1]
 
-
 def get_snapshot_scale_factors(halo_lightcone_filenames, comm, box_resolution=None):
     """
     Returns the scalefactor corresponding to the snapshots of the halo lightcone. 
@@ -220,10 +224,10 @@ def get_snapshot_scale_factors(halo_lightcone_filenames, comm, box_resolution=No
     
     Params:
         :(str) halo_lightcone_filenames :    string for the format of the halo lightcone filename with {file_nr} as a variable. 
-                                                    'path/to/halo/lightcone/files/file_for_snapshot_{file_nr}.hdf5'
-        :(str) box_resolution           :   box size and resolution identifier for simulation, e.g. 'L2800N5040'. Required for when 
-                                                    "Header/NumberOfFiles" attribute is not found so that the hard coded snapshot number 
-                                                    redshifts can be used as a fall back. 
+                                                'path/to/halo/lightcone/files/file_for_snapshot_{file_nr}.hdf5'
+        :(str) box_resolution           :   box size and resolution identifier for simulation, e.g. 'L2800N5040'. 
+                                                Required for when "Header/NumberOfFiles" is not found, so that the hard coded
+                                                 snapshot number and redshifts table can be used as a fall back. 
     Returns
         {snapshot numbers: snapshot scalefactors}
     """
@@ -251,9 +255,7 @@ def get_snapshot_scale_factors(halo_lightcone_filenames, comm, box_resolution=No
     
     if not has_snapshots_group:
         if box_resolution is None:
-            raise RuntimeError(
-                "Halo lightcone catalogue has no Snapshots group; --box-resolution must be "
-                "given so the hardcoded snapshot/redshift table can be used instead")
+            raise RuntimeError("Halo lightcone catalogue has no Snapshots group; --box-resolution must be given so the hardcoded snapshot/redshift table can be used instead")
         
         snapshot_numbers, snapshot_redshifts = snapshot_number_redshifts(box_resolution, None)
         snapshot_expansion_factors=1.0/(1.0+snapshot_redshifts.astype(float))
@@ -270,7 +272,6 @@ def read_lightcone_halo_positions_and_radii(args, radius_name, mass_name, zmin=N
     
     If zmin/zmax are given, only halo lightcone snapshots overlapping that
     redshift range (plus margin_snapshots of padding) are read. 
-
     """
 
     # Parallel read the halo catalogue: need (x,y,z), snapnum, id
@@ -288,13 +289,13 @@ def read_lightcone_halo_positions_and_radii(args, radius_name, mass_name, zmin=N
     halo_lightcone_data = mf.read(halo_lightcone_datasets, group="/", read_attributes=True)
 
     # Store index in halo lightcone of each halo
-    nr_local_halos = len(halo_lightcone_data["InputHalos/HaloCatalogueIndex"]) # update property name "ID" -> "InputHalos/HaloCatalogueIndex"
+    nr_local_halos = len(halo_lightcone_data["InputHalos/HaloCatalogueIndex"])
     offset = comm.scan(nr_local_halos) - nr_local_halos
     halo_lightcone_data["IndexInHaloLightcone"] = np.arange(nr_local_halos, dtype=int) + offset
 
     # Repartition halos for better load balancing
     message("Repartition halo catalogue")
-    nr_local_halos = len(halo_lightcone_data["InputHalos/HaloCatalogueIndex"]) # update property name
+    nr_local_halos = len(halo_lightcone_data["InputHalos/HaloCatalogueIndex"])
     nr_total_halos = comm.allreduce(nr_local_halos)
     nr_desired = np.zeros(comm_size, dtype=int)
     nr_desired[:] = nr_total_halos // comm_size
@@ -314,8 +315,7 @@ def read_lightcone_halo_positions_and_radii(args, radius_name, mass_name, zmin=N
 
     # Sort locally by snapnum
     message("Sorting local lightcone halos by snapshot")
-    #order = np.argsort(halo_lightcone_data["SnapNum"])
-    order = np.argsort(halo_lightcone_data["Lightcone/SnapshotNumber"]) # update property name
+    order = np.argsort(halo_lightcone_data["Lightcone/SnapshotNumber"])
     for name in halo_lightcone_data:
         halo_lightcone_data[name] = halo_lightcone_data[name][order,...]
 
@@ -359,15 +359,20 @@ def read_lightcone_halo_positions_and_radii(args, radius_name, mass_name, zmin=N
     for snapnum in unique_snap_all:
 
         # Datasets to read from SOAP
-        soap_datasets = ("InputHalos/HaloCatalogueIndex", radius_name, mass_name) # Updated to work with HBT-SOAP. 
+        soap_datasets = ("InputHalos/HaloCatalogueIndex", radius_name, mass_name) # Updated to work with SOAP-HBT. 
 
         # Read the SOAP catalogue for this snapshot
         message(f"Reading SOAP output for snapshot {snapnum}")
         mf = phdf5.MultiFile(args.soap_filenames % {"snap_nr" : snapnum}, file_idx=(0,), comm=comm)
         soap_data = mf.read(soap_datasets, read_attributes=True)
-
+        
         # Get the expansion factor of this snapshot
-        a = scale_factor_of_snapshot[snapnum]
+        if comm_rank == 0:
+            with h5py.File(args.soap_filenames % {"snap_nr" : snapnum}, "r") as infile:
+                a = float(attr_scalar(infile["Header"].attrs["Scale-factor"][:])) # SOAP-HBT path to snapshot scale factor
+        else:
+            a = None
+        a = comm.bcast(a)
 
         # Ensure radii are in comoving units
         radius_a_exponent = float(attr_scalar(soap_data[radius_name].attrs["a-scale exponent"]))
@@ -412,7 +417,7 @@ def read_lightcone_index(args):
     Read the index file and determine names of all particle files and which particle types are present
     """
     
-    # Particle types which may be in the lightcone:("BH", "DM", "Gas", "Neutrino", "Stars") 
+    # Particle types which may be in the lightcone: ("BH", "DM", "Gas", "Neutrino", "Stars")
     type_names = tuple(args.particle_types)
     type_z_range = {}
 
@@ -465,7 +470,7 @@ def compute_particle_group_index(halo_id, halo_pos, halo_radius, halo_mass, part
     nr_particles_total = comm.allreduce(nr_particles)
     message(f"Have {nr_particles_total} particles and {nr_halos_total} halos")
 
-    # Will split the halos and particles by x coordinate, with a roughly
+    # Split the halos and particles by x coordinate, with a roughly
     # constant number of particles per rank. First, sort the particles by x.
     message("Sorting particles by x coordinate")
     sort_key = part_pos[:,0].copy()
@@ -499,8 +504,6 @@ def compute_particle_group_index(halo_id, halo_pos, halo_radius, halo_mass, part
     message(f"Halos within redshift range = {nr_halos_left} of {nr_halos_total}")
 
     # Determine the range of x coordinates of halos which could overlap particles on this rank.
-    # A rank with no local particles reports a degenerate range (+inf) instead of calling np.amin/np.amax on an empty array. 
-    # searchsorted() correctly selects zero haloes for ranks with no local particles rather than crashing or computing a negative count.
     if part_pos.shape[0] > 0:
         local_x_min = np.amin(part_pos[:,0]) - max_radius
         local_x_max = np.amax(part_pos[:,0]) + max_radius
@@ -636,8 +639,8 @@ def compute_particle_group_index(halo_id, halo_pos, halo_radius, halo_mass, part
             # Assign particles to this halo if (particle radius / halo mass)**2 is smaller
             # than the smallest value so far. 
             # Reuse part_halo_r_frac_2 as scratch storage
-            # for this squared metric instead of the true fractional radius, since
-            # overlap_method is fixed for the whole run so the two never coexist.
+            # for this squared metric instead of the true fractional radius.
+            # The overlap_method is fixed so the two never coexist.
             mass_weighted_metric_2 = r_part_2 / (halo_mass[i]**2)
             to_update = (mass_weighted_metric_2 < part_halo_r_frac_2[idx])
         else:
@@ -692,10 +695,6 @@ def main(args):
     message(f"Halo overlap method: {args.overlap_method}")
 
     # Read in position and radius for halos in the lightcone.
-    # if args.centrals-only (default):
-    #       use SO values, defined for central subhalos only.
-    # elif args.all-subhalos:
-    #      use BoundSubhalo values, which are defined for centrals and satellites alike.
     if args.centrals_only:
         message(f"Halo radius definition: {args.soap_so_name} (centrals only)")
         radius_name = f"{args.soap_so_name}/SORadius"
@@ -735,7 +734,7 @@ def main(args):
     for ptype in type_z_range:
         
         message(f"\nProcessing particle type: {ptype}")
-        mode = "w" if create_files else "r+" # write mode ('w') if first call, otherwise read + update ('r+')
+        mode = "w" if create_files else "r+" # write mode if first call, otherwise read + update
         
         # Determine batches of files. 
         # We reduce the peak overhead cost by update files in batches instead of all files at once. 
@@ -749,7 +748,6 @@ def main(args):
             mf_batch = phdf5.MultiFile(batch_input_files, comm=comm)
 
             # Read in positions of lightcone particles of this type
-            #message(f"Reading particles")
             part_pos = mf_batch.read("Coordinates", group=ptype)
         
             report_rss("set multifile for coordinates", comm)
@@ -775,10 +773,8 @@ def main(args):
 
             # Assign group indexes to the particles
             message("Assigning group indexes")
-            #report_rss("Assigning group indexes", comm)
             halo_id = halo_lightcone_data["IndexInHaloLightcone"] # we need this. 
-            #halo_pos = halo_lightcone_data["Pos_minpot"] 
-            halo_pos = halo_lightcone_data["Lightcone/HaloCentre"] # WILL UPDATES: update property name for new halo lightcone format
+            halo_pos = halo_lightcone_data["Lightcone/HaloCentre"] # updated property name for new halo lightcone format
             halo_radius = halo_lightcone_data[radius_name]
             halo_mass = halo_lightcone_data[mass_name]
             part_halo_id, part_halo_mass, part_halo_r_frac = compute_particle_group_index(halo_id, halo_pos, halo_radius, halo_mass, part_pos, overlap_method)
@@ -812,7 +808,7 @@ def main(args):
             # determine halo mass dset name 
             if mass_name =="BoundSubhalo/TotalMass":
                 HaloMass_column_name="TotalBoundMass"
-            elif (mass_name==f"{args.soap_so_name}/TotalMass") or args.centrals_only==True:
+            elif (mass_name==f"{args.soap_so_name}/TotalMass") or arg.centrals_only==True:
                 HaloMass_column_name="HaloMass_"+args.soap_so_name.split("/")[-1]
             else:
                 HaloMass_column_name="HaloMass"
@@ -837,7 +833,7 @@ def main(args):
 
         # Only need to create new output files for the first type
         create_files = False
-        
+
     comm.barrier()
 
     # Discard reordered halo lightcone data
@@ -889,7 +885,7 @@ def main(args):
             del halo_index
             del mf_out_batch
 
-    
+
 if __name__ == "__main__":
 
     # Get command line arguments
