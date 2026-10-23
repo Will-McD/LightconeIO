@@ -203,7 +203,7 @@ class Snapshot_Cosmology_For_Lightcone:
             # cone shells 
             r_outer=comoving_outer_radius*(1-np.cos(phi))
             r_inner=comoving_inner_radius*(1-np.cos(phi))
-            shell_volume = (2/3)*np.pi * ((comoving_outer_radius**2 * r_outer) - (comoving_outer_radius**2 * r_outer))
+            shell_volume = (2/3)*np.pi * ((comoving_outer_radius**2 * r_outer) - (comoving_inner_radius**2 * r_inner))
         
         return shell_volume
 
